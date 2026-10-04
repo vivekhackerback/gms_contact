@@ -42,7 +42,7 @@ class SyncService {
   async checkServer(): Promise<boolean> {
     const online = await apiService.checkServerHealth();
     this.serverOnline = online;
-    this.notify(online ? 'Server is connected' : 'Working offline (server unreachable)');
+    this.notify(online ? 'Connected to server database' : 'Server is unreachable');
     return online;
   }
 
@@ -86,6 +86,33 @@ class SyncService {
   }
 
   /**
+   * Fetch contacts directly from MySQL server and refresh local storage
+   */
+  async fetchServerContactsDirectly(): Promise<FullContact[]> {
+    try {
+      const serverContacts = await apiService.fetchContacts();
+      if (Array.isArray(serverContacts)) {
+        const merged: FullContact[] = serverContacts.map(sc => ({
+          ...sc,
+          local_id: sc.local_id || `loc_srv_${sc.id}`,
+          server_id: sc.id,
+          sync_status: 'synced',
+          sync_version: sc.sync_version || 1
+        }));
+        await localDb.replaceAll(merged);
+        this.serverOnline = true;
+        this.lastSyncTime = new Date().toISOString();
+        this.notify('Fetched live contacts from server database');
+        return merged;
+      }
+      return await localDb.getAll();
+    } catch (e: any) {
+      console.warn('Fetch server contacts error:', e.message);
+      return await localDb.getAll();
+    }
+  }
+
+  /**
    * Trigger bi-directional batch sync
    */
   async triggerSync(): Promise<{ success: boolean; message: string }> {
@@ -94,7 +121,7 @@ class SyncService {
     }
 
     this.isSyncing = true;
-    this.notify('Synchronizing contacts...');
+    this.notify('Connecting to server database...');
 
     try {
       const online = await apiService.checkServerHealth();
@@ -105,6 +132,7 @@ class SyncService {
         return { success: false, message: 'Server is currently unreachable' };
       }
 
+      // 1. Upload pending changes
       const pending = await localDb.getPendingSync();
       if (pending.length > 0) {
         const syncRes = await apiService.batchSync(pending, this.lastSyncTime || undefined);
@@ -117,23 +145,23 @@ class SyncService {
         }
       }
 
-      // Fetch fresh server contacts to ensure latest copy
+      // 2. Fetch fresh server contacts from MySQL
       const serverContacts = await apiService.fetchContacts();
-      if (serverContacts && serverContacts.length > 0) {
+      if (Array.isArray(serverContacts)) {
         const localContacts = await localDb.getAll();
-        const pendingMap = new Map(localContacts.filter(c => c.sync_status === 'pending_sync').map(c => [c.local_id, c]));
+        const pendingMap = new Map(
+          localContacts.filter(c => c.sync_status === 'pending_sync').map(c => [c.local_id, c])
+        );
 
-        const merged: FullContact[] = serverContacts.map(sc => {
-          return {
-            ...sc,
-            local_id: sc.local_id || `loc_srv_${sc.id}`,
-            server_id: sc.id,
-            sync_status: 'synced',
-            sync_version: sc.sync_version || 1
-          };
-        });
+        const merged: FullContact[] = serverContacts.map(sc => ({
+          ...sc,
+          local_id: sc.local_id || `loc_srv_${sc.id}`,
+          server_id: sc.id,
+          sync_status: 'synced',
+          sync_version: sc.sync_version || 1
+        }));
 
-        // Add back pending items that haven't reached server yet
+        // Preserve pending local creations that haven't synced yet
         pendingMap.forEach(item => {
           if (!merged.find(m => m.local_id === item.local_id || (item.server_id && m.server_id === item.server_id))) {
             merged.unshift(item);
@@ -145,7 +173,7 @@ class SyncService {
 
       this.lastSyncTime = new Date().toISOString();
       this.isSyncing = false;
-      this.notify('All contacts synchronized successfully');
+      this.notify('All contacts synchronized with server');
       return { success: true, message: 'All contacts synchronized successfully' };
     } catch (err: any) {
       this.isSyncing = false;

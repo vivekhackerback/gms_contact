@@ -26,7 +26,13 @@ export default function ContactDetailsScreen() {
   const loadContact = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await localDb.getById(id);
+      let data = await localDb.getById(id);
+      if (!data) {
+        data = await apiService.getContact(id);
+        if (data) {
+          await localDb.save(data);
+        }
+      }
       setContact(data);
     } catch (e) {
       console.warn('Error fetching contact:', e);

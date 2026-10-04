@@ -1,70 +1,41 @@
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
+const mysql = require('mysql2/promise');
 
-const dbFilePath = path.join(__dirname, 'school_contacts_db.json');
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '3306', 10),
+  user: process.env.DB_USER || 'u109731178_gms_contact_u',
+  password: process.env.DB_PASSWORD || 'Vivek@8651615629',
+  database: process.env.DB_NAME || 'u109731178_gms_contact_db',
+  waitForConnections: true,
+  connectionLimit: 15,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  dateStrings: true // Return date and datetime as strings (prevents timezone skew)
+});
 
-// Normalized in-memory structure with JSON persistence
-const initialData = {
-  contacts: [],
-  students: [],
-  parents: [],
-  student_parent: [],
-  teachers: [],
-  staff: [],
-  drivers: [],
-  management: [],
-  counters: {
-    contacts: 0,
-    students: 0,
-    parents: 0,
-    student_parent: 0,
-    teachers: 0,
-    staff: 0,
-    drivers: 0,
-    management: 0
-  }
-};
+async function query(sql, params = []) {
+  const [rows] = await pool.query(sql, params);
+  return rows;
+}
 
-let store = null;
-
-function loadStore() {
-  if (store) return store;
+async function testConnection() {
   try {
-    if (fs.existsSync(dbFilePath)) {
-      const raw = fs.readFileSync(dbFilePath, 'utf8');
-      store = JSON.parse(raw);
-    } else {
-      store = JSON.parse(JSON.stringify(initialData));
-      saveStore();
-    }
+    const conn = await pool.getConnection();
+    console.log(`[Database] Successfully connected to MySQL database "${process.env.DB_NAME || 'school_contacts_db'}" at ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}`);
+    conn.release();
+    return true;
   } catch (err) {
-    console.error('Error loading db file, resetting:', err);
-    store = JSON.parse(JSON.stringify(initialData));
-    saveStore();
-  }
-  return store;
-}
-
-function saveStore() {
-  try {
-    fs.writeFileSync(dbFilePath, JSON.stringify(store, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error saving db file:', err);
+    console.error('[Database Connection Error]: Could not connect to MySQL server.');
+    console.error(`Reason: ${err.message}`);
+    console.error('Make sure your MySQL server is running and database "school_contacts_db" is created.');
+    return false;
   }
 }
 
-function nextId(table) {
-  if (!store.counters) store.counters = {};
-  if (!store.counters[table]) store.counters[table] = 0;
-  store.counters[table]++;
-  return store.counters[table];
-}
-
-const db = {
-  load: loadStore,
-  save: saveStore,
-  nextId,
-  getStore: () => loadStore()
+module.exports = {
+  pool,
+  query,
+  testConnection
 };
-
-module.exports = db;

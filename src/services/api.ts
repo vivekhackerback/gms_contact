@@ -1,9 +1,14 @@
 import { FullContact } from '../types/contact';
+import { DEFAULT_API_BASE_URL } from '../config/appConfig';
 
-export const DEFAULT_API_BASE = 'http://localhost:4000/api';
+export const DEFAULT_API_BASE = DEFAULT_API_BASE_URL;
 
 class ApiService {
   private baseUrl = DEFAULT_API_BASE;
+
+  constructor() {
+    this.baseUrl = DEFAULT_API_BASE_URL.replace(/\/+$/, '');
+  }
 
   setBaseUrl(url: string) {
     this.baseUrl = url.replace(/\/+$/, '');
@@ -13,16 +18,36 @@ class ApiService {
     return this.baseUrl;
   }
 
+  private getHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'ngrok-skip-browser-warning': 'true' // Bypasses ngrok free tier HTML interstitial screen
+    };
+  }
+
   async checkServerHealth(): Promise<boolean> {
     try {
       const ctrl = new AbortController();
-      const timeoutId = setTimeout(() => ctrl.abort(), 2500);
-      const res = await fetch(`${this.baseUrl}/dashboard`, { signal: ctrl.signal });
+      const timeoutId = setTimeout(() => ctrl.abort(), 4000);
+      const endpoint = this.baseUrl.endsWith('.php') ? this.baseUrl : `${this.baseUrl}/dashboard.php`;
+      const res = await fetch(endpoint, {
+        headers: this.getHeaders(),
+        signal: ctrl.signal
+      });
       clearTimeout(timeoutId);
       return res.ok;
     } catch {
       return false;
     }
+  }
+
+  async fetchDashboardStats(): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/dashboard.php`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
   }
 
   async checkDuplicate(params: {
@@ -38,7 +63,9 @@ class ApiService {
       if (params.employee_id) q.append('employee_id', params.employee_id);
       if (params.exclude_id) q.append('exclude_id', String(params.exclude_id));
 
-      const res = await fetch(`${this.baseUrl}/contacts/check-duplicate?${q.toString()}`);
+      const res = await fetch(`${this.baseUrl}/check_duplicate.php?${q.toString()}`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return { exists: false, contact: null };
       return await res.json();
     } catch (e) {
@@ -63,16 +90,28 @@ class ApiService {
     if (query?.subject) q.append('subject', query.subject);
     if (query?.department) q.append('department', query.department);
 
-    const res = await fetch(`${this.baseUrl}/contacts?${q.toString()}`);
+    const url = `${this.baseUrl}/get_contacts.php?${q.toString()}`;
+    const res = await fetch(url, {
+      headers: this.getHeaders()
+    });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const body = await res.json();
     return body.data || [];
   }
 
+  async getContact(id: number | string): Promise<FullContact | null> {
+    const res = await fetch(`${this.baseUrl}/get_contact.php?id=${id}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body.data || null;
+  }
+
   async createContact(contact: FullContact): Promise<{ server_id: number; local_id?: string }> {
-    const res = await fetch(`${this.baseUrl}/contacts`, {
+    const res = await fetch(`${this.baseUrl}/save_contact.php`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(contact)
     });
     if (!res.ok) {
@@ -83,10 +122,10 @@ class ApiService {
   }
 
   async updateContact(id: number, contact: FullContact): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/contacts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(contact)
+    const res = await fetch(`${this.baseUrl}/save_contact.php`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ ...contact, id, server_id: id })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -95,8 +134,10 @@ class ApiService {
   }
 
   async deleteContact(id: number): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/contacts/${id}`, {
-      method: 'DELETE'
+    const res = await fetch(`${this.baseUrl}/delete_contact.php?id=${id}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ id })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -105,9 +146,9 @@ class ApiService {
   }
 
   async batchSync(pendingContacts: FullContact[], lastSyncTime?: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/contacts/sync`, {
+    const res = await fetch(`${this.baseUrl}/sync_contacts.php`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify({
         device_id: 'mobile_device_1',
         pending_contacts: pendingContacts,

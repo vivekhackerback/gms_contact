@@ -27,24 +27,35 @@ export default function ContactsScreen() {
   const [selectedSubFilter, setSelectedSubFilter] = useState('');
   const [serverOnline, setServerOnline] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [syncStatusMsg, setSyncStatusMsg] = useState('');
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (shouldSyncServer = false) => {
     try {
+      if (shouldSyncServer) {
+        setRefreshing(true);
+        await syncService.triggerSync();
+      }
       const all = await localDb.getAll();
       setContacts(all);
       const stats = await localDb.getDashboardStats();
       setPendingCount(stats.pending_sync);
-    } catch (e) {
-      console.warn('Failed to load contacts from local db:', e);
+    } catch (e: any) {
+      console.warn('Failed to load contacts:', e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
+  // Fetch from server on first launch/mount
+  useEffect(() => {
+    loadData(true);
+  }, [loadData]);
+
+  // Reload local cache when focused
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadData(false);
     }, [loadData])
   );
 
@@ -52,6 +63,9 @@ export default function ContactsScreen() {
     const unsub = syncService.subscribe((report) => {
       setServerOnline(report.serverOnline);
       setPendingCount(report.pendingCount);
+      if (report.lastMessage) {
+        setSyncStatusMsg(report.lastMessage);
+      }
     });
     return unsub;
   }, []);
@@ -59,7 +73,7 @@ export default function ContactsScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await syncService.triggerSync();
-    await loadData();
+    await loadData(false);
   };
 
   // Filter and search computation
@@ -177,23 +191,20 @@ export default function ContactsScreen() {
             ]}
           />
           <Text style={styles.bannerText}>
-            {serverOnline ? 'Connected to Server' : 'Working Offline'}
+            {serverOnline ? 'Connected to MySQL Server' : 'Working Offline'}
           </Text>
         </View>
 
         {pendingCount > 0 ? (
-          <TouchableOpacity
-            style={styles.pendingBtn}
-            onPress={() => syncService.triggerSync()}
-          >
-            <Ionicons name="cloud-upload" size={14} color="#B45309" />
-            <Text style={styles.pendingBtnText}>{pendingCount} Pending Sync</Text>
+          <TouchableOpacity style={styles.pendingBtn} onPress={onRefresh}>
+            <Ionicons name="cloud-upload-outline" size={13} color="#B45309" />
+            <Text style={styles.pendingBtnText}>{pendingCount} pending sync</Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.syncedTag}>
-            <Ionicons name="checkmark-circle" size={14} color="#15803D" />
-            <Text style={styles.syncedTagText}>All Synced</Text>
-          </View>
+          <TouchableOpacity style={styles.syncedTag} onPress={onRefresh}>
+            <Ionicons name="checkmark-done" size={13} color="#15803D" />
+            <Text style={styles.syncedTagText}>Synced</Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -214,7 +225,7 @@ export default function ContactsScreen() {
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#0284C7" />
-          <Text style={styles.loadingText}>Loading contacts...</Text>
+          <Text style={styles.loadingText}>Fetching contacts from server database...</Text>
         </View>
       ) : (
         <FlatList
@@ -238,13 +249,17 @@ export default function ContactsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color="#CBD5E1" />
+              <Ionicons name="server-outline" size={48} color="#94A3B8" />
               <Text style={styles.emptyTitle}>No Contacts Found</Text>
               <Text style={styles.emptySubtitle}>
                 {searchQuery
                   ? 'Try modifying your search query or filters.'
-                  : 'Tap the "+" button below to add your first school contact.'}
+                  : 'No contacts retrieved from the server. Tap below to fetch directly from your server.'}
               </Text>
+              <TouchableOpacity style={styles.fetchBtn} onPress={onRefresh}>
+                <Ionicons name="cloud-download-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.fetchBtnText}>Fetch From Server</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -359,6 +374,22 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 18,
+    marginBottom: 16,
+  },
+  fetchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+    marginTop: 6,
+  },
+  fetchBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
   fab: {
     position: 'absolute',

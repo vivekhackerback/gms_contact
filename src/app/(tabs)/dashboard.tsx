@@ -48,6 +48,11 @@ export default function DashboardScreen() {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    // Initial sync from server on mount
+    handleSyncNow();
+  }, []);
+
   const handleSyncNow = async () => {
     setSyncing(true);
     const res = await syncService.triggerSync();
@@ -58,8 +63,8 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    await syncService.triggerSync();
     await loadStats();
-    await syncService.checkServer();
   };
 
   if (!stats) {
