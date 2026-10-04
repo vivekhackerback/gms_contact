@@ -1,0 +1,14 @@
+{
+  "name": "gms-contact-server",
+  "version": "1.0.0",
+  "description": "Backend API & Sync Server for School Contact Management",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
