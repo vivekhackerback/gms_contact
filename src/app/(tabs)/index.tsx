@@ -8,8 +8,9 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { localDb } from '../../db/localDb';
 import { syncService } from '../../services/syncService';
 import { makePhoneCall, openWhatsApp } from '../../services/communication';
@@ -19,6 +20,8 @@ import { SearchInput } from '../../components/SearchInput';
 import { FilterBar } from '../../components/FilterBar';
 
 export default function ContactsScreen() {
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ type?: string }>();
   const [contacts, setContacts] = useState<FullContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -28,6 +31,14 @@ export default function ContactsScreen() {
   const [serverOnline, setServerOnline] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncStatusMsg, setSyncStatusMsg] = useState('');
+
+  // Listen to params when navigated from Dashboard cards
+  useEffect(() => {
+    if (params.type) {
+      setSelectedType(params.type);
+      setSelectedSubFilter('');
+    }
+  }, [params.type]);
 
   const loadData = useCallback(async (shouldSyncServer = false) => {
     try {
@@ -231,7 +242,7 @@ export default function ContactsScreen() {
         <FlatList
           data={filteredContacts}
           keyExtractor={(item) => item.local_id || String(item.id || item.server_id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 110 + insets.bottom }]}
           renderItem={({ item }) => (
             <ContactCard
               contact={item}
@@ -267,7 +278,7 @@ export default function ContactsScreen() {
 
       {/* Floating Add Action Button */}
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { bottom: 20 + Math.max(insets.bottom, 8) }]}
         onPress={() => router.push('/contact/new')}
         activeOpacity={0.85}
       >

@@ -10,12 +10,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService } from '../../services/api';
 import { syncService } from '../../services/syncService';
 import { localDb } from '../../db/localDb';
 import { DEFAULT_API_BASE_URL, DOMAIN_URL } from '../../config/appConfig';
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const [apiUrl, setApiUrl] = useState(apiService.getBaseUrl());
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -78,7 +80,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 40 + insets.bottom }]}>
       {/* 1. Server Configuration */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
