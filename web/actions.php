@@ -2,9 +2,26 @@
 /**
  * Backend actions handler for Web Management Portal
  */
+ob_start();
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../api/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
+
+/**
+ * Cleanly sends JSON response, discarding any accidental HTML/PHP warning output
+ */
+function sendJsonResponse($data, $statusCode = 200) {
+    if (ob_get_length()) {
+        ob_clean();
+    }
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data);
+    exit;
+}
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
@@ -29,17 +46,15 @@ try {
             importBatch($pdo);
             break;
         default:
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Invalid action']);
+            sendJsonResponse(['success' => false, 'message' => 'Invalid action'], 400);
             break;
     }
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
+    sendJsonResponse([
         'success' => false,
         'data' => [],
         'error' => $e->getMessage()
-    ]);
+    ], 500);
 }
 
 function getStats($pdo) {
@@ -49,7 +64,7 @@ function getStats($pdo) {
     while ($r = $typeStmt->fetch()) {
         $byType[$r['contact_type']] = (int)$r['cnt'];
     }
-    echo json_encode(['success' => true, 'total' => $total, 'by_type' => $byType]);
+    sendJsonResponse(['success' => true, 'total' => $total, 'by_type' => $byType]);
 }
 
 function getContactsList($pdo) {
@@ -90,7 +105,7 @@ function getContactsList($pdo) {
         $r['children'] = $kidsMap[$r['id']] ?? [];
     }
 
-    echo json_encode(['success' => true, 'data' => $rows]);
+    sendJsonResponse(['success' => true, 'data' => $rows]);
 }
 
 function getSingleContact($pdo) {
@@ -132,7 +147,7 @@ function getSingleContact($pdo) {
         $contact['children'] = $cStmt->fetchAll();
     }
 
-    echo json_encode(['success' => true, 'data' => $contact]);
+    sendJsonResponse(['success' => true, 'data' => $contact]);
 }
 
 function saveContact($pdo) {
@@ -271,7 +286,7 @@ function saveContact($pdo) {
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'id' => $id, 'message' => 'Contact saved successfully!']);
+    sendJsonResponse(['success' => true, 'id' => $id, 'message' => 'Contact saved successfully!']);
 }
 
 function deleteContact($pdo) {
@@ -280,7 +295,7 @@ function deleteContact($pdo) {
 
     $stmt = $pdo->prepare("DELETE FROM contacts WHERE id = ?");
     $stmt->execute([$id]);
-    echo json_encode(['success' => true, 'message' => 'Contact deleted successfully']);
+    sendJsonResponse(['success' => true, 'message' => 'Contact deleted successfully']);
 }
 
 function importBatch($pdo) {
@@ -407,7 +422,7 @@ function importBatch($pdo) {
 
     $pdo->commit();
 
-    echo json_encode([
+    sendJsonResponse([
         'success' => true,
         'imported_count' => $imported,
         'skipped_count' => $skipped,

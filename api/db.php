@@ -27,6 +27,11 @@
 // WHY: Modern web browsers and mobile apps block API calls from different domains/ports
 // unless the server explicitly permits it using these HTTP headers.
 
+// Prevent PHP warnings/notices from corrupting JSON API outputs
+ob_start();
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 // Allow any client (React Native app, web browser, localhost, live domain) to connect
 header('Access-Control-Allow-Origin: *');
 
@@ -55,41 +60,57 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 // ----------------------------------------------------------------------------
 // 3. Multi-Environment Database Configurations
 // ----------------------------------------------------------------------------
-// WHY: In development you often work on your laptop (localhost/XAMPP with 'root'),
-// but in production your app runs on a cloud server (Hostinger) with strict usernames.
-// By listing both configurations below, the script automatically tests each one
-// until it successfully connects. No manual config changes required!
+// Detect if running on local environment (laptop / XAMPP / Apache)
+$is_local_env = (
+    in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']) ||
+    in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) ||
+    php_sapi_name() === 'cli'
+);
 
-$db_configs = [
-    // [Priority 1] Live Production Server (Hostinger / cPanel)
-    [
-        'host' => 'localhost',
-        'user' => 'u109731178_gms_contact_u',
-        'pass' => 'Vivek@8651615629',
-        'name' => 'u109731178_gms_contact_db'
-    ],
-    // [Priority 2] Local Laptop Development (XAMPP / Wamp - Default root user)
-    [
-        'host' => 'localhost',
-        'user' => 'root',
-        'pass' => '',
-        'name' => 'school_contacts_db'
-    ],
-    // [Priority 3] Local Laptop Development (IPv4 127.0.0.1 fallback)
-    [
-        'host' => '127.0.0.1',
-        'user' => 'root',
-        'pass' => '',
-        'name' => 'school_contacts_db'
-    ],
-    // [Priority 4] Local Laptop Development (If local DB was named like production)
-    [
-        'host' => 'localhost',
-        'user' => 'root',
-        'pass' => '',
-        'name' => 'u109731178_gms_contact_db'
+// Prioritize local credentials on localhost, and production credentials on live server
+$db_configs = $is_local_env
+    ? [
+        // Localhost Development (XAMPP / Wamp - default root user)
+        [
+            'host' => 'localhost',
+            'user' => 'root',
+            'pass' => '',
+            'name' => 'school_contacts_db'
+        ],
+        [
+            'host' => '127.0.0.1',
+            'user' => 'root',
+            'pass' => '',
+            'name' => 'school_contacts_db'
+        ],
+        [
+            'host' => 'localhost',
+            'user' => 'root',
+            'pass' => '',
+            'name' => 'u109731178_gms_contact_db'
+        ],
+        [
+            'host' => 'localhost',
+            'user' => 'u109731178_gms_contact_u',
+            'pass' => 'Vivek@8651615629',
+            'name' => 'u109731178_gms_contact_db'
+        ]
     ]
-];
+    : [
+        // Live Production Server (Hostinger / cPanel)
+        [
+            'host' => 'localhost',
+            'user' => 'u109731178_gms_contact_u',
+            'pass' => 'Vivek@8651615629',
+            'name' => 'u109731178_gms_contact_db'
+        ],
+        [
+            'host' => 'localhost',
+            'user' => 'root',
+            'pass' => '',
+            'name' => 'school_contacts_db'
+        ]
+    ];
 
 
 // ----------------------------------------------------------------------------
@@ -103,7 +124,8 @@ $last_error = null;
 
 foreach ($db_configs as $cfg) {
     try {
-        $pdo = new PDO(
+        // Use @ to prevent PHP from printing warnings to standard output if a trial fails
+        $pdo = @new PDO(
             "mysql:host={$cfg['host']};dbname={$cfg['name']};charset=utf8mb4",
             $cfg['user'],
             $cfg['pass'],
@@ -128,6 +150,9 @@ foreach ($db_configs as $cfg) {
 
 // If none of the configurations connected successfully, return an HTTP 500 error response
 if (!$pdo) {
+    if (ob_get_length()) {
+        ob_clean();
+    }
     http_response_code(500);
     echo json_encode([
         'success' => false,

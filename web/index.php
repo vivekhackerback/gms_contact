@@ -837,7 +837,14 @@
             try {
               const res = JSON.parse(xhr.responseText);
               if (res && res.error) errMsg = res.error;
-            } catch(e) {}
+            } catch(e) {
+              if (xhr.responseText && xhr.responseText.includes('<')) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = xhr.responseText;
+                const cleanText = (tmp.textContent || tmp.innerText || '').trim();
+                errMsg = 'Server notice: ' + (cleanText.substring(0, 180) || 'Invalid response');
+              }
+            }
             showTableError(errMsg);
           }
         },
