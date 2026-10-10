@@ -60,11 +60,16 @@ try {
 // 6. Clean Indian mobile numbers
 function normalizeMobile($phone)
 {
-    $phone = preg_replace('/\D/', '', (string) $phone);
+    $digits = preg_replace('/\D/', '', (string) $phone);
 
-    if (strlen($phone) === 12 && substr($phone, 0, 2) === '91') {
-        $phone = substr($phone, 2);
+    // If starts with 91 and has 12 digits: remove 91
+    if (strlen($digits) === 12 && substr($digits, 0, 2) === '91') {
+        $digits = substr($digits, 2);
+    }
+    // If starts with 0 and has 11 digits: remove 0
+    elseif (strlen($digits) === 11 && substr($digits, 0, 1) === '0') {
+        $digits = substr($digits, 1);
     }
 
-    return $phone;
+    return $digits;
 }

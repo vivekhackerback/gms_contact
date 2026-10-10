@@ -99,11 +99,20 @@ export default function ContactsScreen() {
     // Role-specific SubFilter
     if (selectedSubFilter) {
       if (selectedType === 'student') {
-        result = result.filter(
-          (c) =>
-            c.student_details?.class === selectedSubFilter ||
-            c.student_class === selectedSubFilter
-        );
+        result = result.filter((c) => {
+          let studentClass = (c.student_details?.class || c.student_class || '').trim().toLowerCase();
+          let targetClass = selectedSubFilter.trim().toLowerCase();
+
+          // Normalize ordinal numbers: "1st" -> "1", "2nd" -> "2", etc.
+          studentClass = studentClass.replace(/^(\d+)(st|nd|rd|th)$/, '$1');
+          targetClass = targetClass.replace(/^(\d+)(st|nd|rd|th)$/, '$1');
+
+          // Normalize pre-nur / prenur / pre nur
+          studentClass = studentClass.replace(/[-\s]/g, '');
+          targetClass = targetClass.replace(/[-\s]/g, '');
+
+          return studentClass === targetClass;
+        });
       } else if (selectedType === 'teacher') {
         result = result.filter((c) => {
           const subj =

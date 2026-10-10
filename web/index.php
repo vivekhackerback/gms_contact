@@ -280,6 +280,11 @@
           <span>Import Excel</span>
         </button>
 
+        <button class="btn btn-outline-danger btn-sm px-3 py-2 rounded-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#deleteCategoryModal" onclick="openDeleteCategoryModal()">
+          <i class="bi bi-trash3-fill text-danger fs-6"></i>
+          <span>Delete by Category</span>
+        </button>
+
         <button class="btn btn-success btn-sm px-3 py-2 rounded-3 d-flex align-items-center gap-2 shadow-sm" onclick="openAddContactModal()">
           <i class="bi bi-person-plus-fill fs-6"></i>
           <span>Add Contact</span>
@@ -393,15 +398,42 @@
           <p class="text-muted small mb-0">Search, filter, edit, or export school records in real-time.</p>
         </div>
 
-        <!-- Filter Buttons -->
-        <div class="btn-group btn-group-sm flex-wrap shadow-sm rounded-pill p-1 bg-light border" role="group" id="roleFilterButtonGroup">
-          <button type="button" class="btn btn-primary rounded-pill px-3 active" onclick="filterTableByRole('all', this)">All</button>
-          <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('student', this)">Students</button>
-          <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('parent', this)">Parents</button>
-          <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('teacher', this)">Teachers</button>
-          <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('staff', this)">Staff</button>
-          <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('driver', this)">Drivers</button>
-          <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('management', this)">Management</button>
+        <!-- Filter Controls: Role Buttons & Class Dropdown -->
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <!-- Class Filter Dropdown -->
+          <div class="d-flex align-items-center gap-1 bg-white rounded-pill px-2 py-1 border shadow-sm">
+            <span class="small fw-semibold text-muted ps-1"><i class="bi bi-funnel-fill text-primary"></i> Class:</span>
+            <select class="form-select form-select-sm border-0 py-0 ps-1 pe-4 fw-semibold text-dark" id="webClassFilterSelect" style="width: auto; background-position: right 0.4rem center; cursor: pointer;" onchange="filterTableByClass(this.value)">
+              <option value="all">All Classes</option>
+              <option value="PRE-NUR">Pre-NUR</option>
+              <option value="NUR">NUR</option>
+              <option value="LKG">LKG</option>
+              <option value="UKG">UKG</option>
+              <option value="1">Class 1</option>
+              <option value="2">Class 2</option>
+              <option value="3">Class 3</option>
+              <option value="4">Class 4</option>
+              <option value="5">Class 5</option>
+              <option value="6">Class 6</option>
+              <option value="7">Class 7</option>
+              <option value="8">Class 8</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+              <option value="11">Class 11</option>
+              <option value="12">Class 12</option>
+            </select>
+          </div>
+
+          <!-- Filter Buttons -->
+          <div class="btn-group btn-group-sm flex-wrap shadow-sm rounded-pill p-1 bg-light border" role="group" id="roleFilterButtonGroup">
+            <button type="button" class="btn btn-primary rounded-pill px-3 active" onclick="filterTableByRole('all', this)">All</button>
+            <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('student', this)">Students</button>
+            <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('parent', this)">Parents</button>
+            <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('teacher', this)">Teachers</button>
+            <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('staff', this)">Staff</button>
+            <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('driver', this)">Drivers</button>
+            <button type="button" class="btn btn-light rounded-pill px-3" onclick="filterTableByRole('management', this)">Management</button>
+          </div>
         </div>
       </div>
 
@@ -764,6 +796,116 @@
     </div>
   </div>
 
+  <!-- ====================================================================== -->
+  <!-- MODAL: DELETE CONTACTS BY CATEGORY -->
+  <!-- ====================================================================== -->
+  <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-danger text-white">
+          <div>
+            <h5 class="modal-title fw-bold">
+              <i class="bi bi-trash3-fill me-2"></i>Delete Contacts by Category
+            </h5>
+            <small class="text-white-50">Bulk delete contacts belonging to selected roles</small>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill text-warning fs-5 flex-shrink-0"></i>
+            <div class="small">
+              <strong>Warning:</strong> Selected categories will be deleted immediately along with their related records. This action cannot be undone.
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold text-dark">Select Categories to Delete:</span>
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 11px;" onclick="selectAllDeleteCategories(true)">Select All</button>
+              <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 11px;" onclick="selectAllDeleteCategories(false)">Clear</button>
+            </div>
+          </div>
+
+          <div class="list-group shadow-sm border rounded-3 mb-3" id="deleteCategoriesList">
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="student" id="delCatStudent" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1">Student</span>
+                <span class="fw-semibold text-dark">Students</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_student">0 contacts</span>
+            </label>
+
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="parent" id="delCatParent" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 py-1">Parent</span>
+                <span class="fw-semibold text-dark">Parents</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_parent">0 contacts</span>
+            </label>
+
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="teacher" id="delCatTeacher" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1">Teacher</span>
+                <span class="fw-semibold text-dark">Teachers</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_teacher">0 contacts</span>
+            </label>
+
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="staff" id="delCatStaff" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-purple bg-opacity-10 text-purple border border-purple border-opacity-25 px-2 py-1" style="background-color: #f3e8ff; color: #9333ea;">Staff</span>
+                <span class="fw-semibold text-dark">Staff</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_staff">0 contacts</span>
+            </label>
+
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="driver" id="delCatDriver" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1">Driver</span>
+                <span class="fw-semibold text-dark">Drivers</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_driver">0 contacts</span>
+            </label>
+
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="management" id="delCatManagement" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1">Management</span>
+                <span class="fw-semibold text-dark">Management</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_management">0 contacts</span>
+            </label>
+
+            <label class="list-group-item d-flex align-items-center justify-content-between gap-3 py-2 cursor-pointer">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input flex-shrink-0 del-cat-check" type="checkbox" value="other" id="delCatOther" onchange="updateDeleteCategorySummary()">
+                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1">Other</span>
+                <span class="fw-semibold text-dark">Other</span>
+              </div>
+              <span class="badge bg-light text-muted border px-2" id="delCount_other">0 contacts</span>
+            </label>
+          </div>
+
+          <div id="deleteCategorySummary" class="p-3 bg-light rounded-3 border text-center small text-muted">
+            No category selected
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger px-4 fw-semibold" id="btnConfirmCategoryDelete" disabled onclick="executeCategoryDelete()">
+            <i class="bi bi-trash3-fill me-1"></i> Delete Selected Categories
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- jQuery & Bootstrap 5 JS -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1028,6 +1170,43 @@
       }
     }
 
+    /**
+     * Filter Table by Student Class
+     */
+    function filterTableByClass(selectedClass) {
+      if (!dataTableInstance) return;
+
+      if (!selectedClass || selectedClass === 'all') {
+        // Clear class custom filter
+        $.fn.dataTable.ext.search = $.fn.dataTable.ext.search.filter(fn => fn._name !== 'classFilter');
+        dataTableInstance.draw();
+        return;
+      }
+
+      // Remove existing class filter if any
+      $.fn.dataTable.ext.search = $.fn.dataTable.ext.search.filter(fn => fn._name !== 'classFilter');
+
+      const classFilterFn = function(settings, data, dataIndex, rowData) {
+        if (!rowData) return true;
+        let studentCls = (rowData.student_class || '').toString().trim().toLowerCase();
+        let target = selectedClass.trim().toLowerCase();
+
+        // Normalize ordinal suffixes like "1st" -> "1", "2nd" -> "2"
+        studentCls = studentCls.replace(/^(\d+)(st|nd|rd|th)$/, '$1');
+        target = target.replace(/^(\d+)(st|nd|rd|th)$/, '$1');
+
+        // Normalize pre-nur / pre nur / prenur
+        studentCls = studentCls.replace(/[-\s]/g, '');
+        target = target.replace(/[-\s]/g, '');
+
+        return studentCls === target;
+      };
+      classFilterFn._name = 'classFilter';
+
+      $.fn.dataTable.ext.search.push(classFilterFn);
+      dataTableInstance.draw();
+    }
+
     function capitalize(str) {
       return str.charAt(0).toUpperCase() + str.slice(1);
     }
@@ -1200,6 +1379,143 @@
               Swal.fire('Error', res.error || 'Could not delete contact', 'error');
             }
           }, 'json');
+        }
+      });
+    }
+
+    /**
+     * Category Bulk Delete Handlers
+     */
+    let categoryStatsCache = {};
+
+    function openDeleteCategoryModal() {
+      $('.del-cat-check').prop('checked', false);
+      updateDeleteCategorySummary();
+
+      // Refresh category counts
+      $.getJSON('actions.php?action=stats', function(res) {
+        if (res.success && res.by_type) {
+          categoryStatsCache = res.by_type;
+          $('#delCount_student').text((res.by_type.student || 0) + ' contacts');
+          $('#delCount_parent').text((res.by_type.parent || 0) + ' contacts');
+          $('#delCount_teacher').text((res.by_type.teacher || 0) + ' contacts');
+          $('#delCount_staff').text((res.by_type.staff || 0) + ' contacts');
+          $('#delCount_driver').text((res.by_type.driver || 0) + ' contacts');
+          $('#delCount_management').text((res.by_type.management || 0) + ' contacts');
+          $('#delCount_other').text((res.by_type.other || 0) + ' contacts');
+        }
+      });
+
+      const modalEl = document.getElementById('deleteCategoryModal');
+      if (modalEl && typeof bootstrap !== 'undefined') {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+      }
+    }
+
+    function selectAllDeleteCategories(state) {
+      $('.del-cat-check').prop('checked', !!state);
+      updateDeleteCategorySummary();
+    }
+
+    function updateDeleteCategorySummary() {
+      const selected = [];
+      let totalContacts = 0;
+
+      $('.del-cat-check:checked').each(function() {
+        const val = $(this).val();
+        selected.push(val);
+        totalContacts += (categoryStatsCache[val] || 0);
+      });
+
+      const btn = $('#btnConfirmCategoryDelete');
+      const summary = $('#deleteCategorySummary');
+
+      if (selected.length === 0) {
+        btn.prop('disabled', true);
+        summary.html('<span class="text-muted">No category selected</span>');
+      } else {
+        btn.prop('disabled', false);
+        const catLabels = selected.map(s => `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 me-1">${s.toUpperCase()}</span>`).join(' ');
+        summary.html(`
+          <div class="text-dark fw-bold mb-1">Selected: ${catLabels}</div>
+          <div class="text-danger fw-semibold">Estimated: approx. ${totalContacts} contact(s) will be permanently erased.</div>
+        `);
+      }
+    }
+
+    function executeCategoryDelete() {
+      const selected = [];
+      $('.del-cat-check:checked').each(function() {
+        selected.push($(this).val());
+      });
+
+      if (selected.length === 0) {
+        Swal.fire('Selection Required', 'Please check at least one category to delete.', 'info');
+        return;
+      }
+
+      const categoryText = selected.map(s => s.toUpperCase()).join(', ');
+
+      Swal.fire({
+        title: 'Delete All Contacts in Selected Categories?',
+        html: `
+          <div class="text-start">
+            <p>You have selected: <b class="text-danger">${categoryText}</b></p>
+            <p class="text-danger fw-bold mb-0">Every contact and all associated records under these categories will be PERMANENTLY deleted from the MySQL database!</p>
+          </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Yes, Delete Everything in Categories',
+        cancelButtonText: 'Cancel'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          Swal.fire({
+            title: 'Deleting Records...',
+            text: 'Removing contacts from database, please wait...',
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+
+          $.ajax({
+            url: 'actions.php?action=delete_by_categories',
+            method: 'POST',
+            data: { categories: selected },
+            dataType: 'json',
+            success: function(res) {
+              if (res.success) {
+                // Hide modal
+                const modalEl = document.getElementById('deleteCategoryModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                Swal.fire({
+                  icon: 'success',
+                  title: 'Deleted Successfully!',
+                  text: res.message || 'Contacts deleted.',
+                  confirmButtonColor: '#16a34a'
+                });
+
+                dataTableInstance.ajax.reload(null, false);
+                loadStats();
+              } else {
+                Swal.fire('Delete Failed', res.error || 'Server rejected request.', 'error');
+              }
+            },
+            error: function(xhr) {
+              let msg = 'Failed to delete categories.';
+              try {
+                const j = JSON.parse(xhr.responseText);
+                if (j && j.error) msg = j.error;
+              } catch(e) {}
+              Swal.fire('Error', msg, 'error');
+            }
+          });
         }
       });
     }

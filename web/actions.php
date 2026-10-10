@@ -42,6 +42,9 @@ try {
         case 'delete':
             deleteContact($pdo);
             break;
+        case 'delete_by_categories':
+            deleteByCategories($pdo);
+            break;
         case 'import_batch':
             importBatch($pdo);
             break;
@@ -298,6 +301,55 @@ function deleteContact($pdo) {
     sendJsonResponse(['success' => true, 'message' => 'Contact deleted successfully']);
 }
 
+function deleteByCategories($pdo) {
+    $types = $_POST['categories'] ?? [];
+    if (!is_array($types) || empty($types)) {
+        throw new Exception('Please select at least one category to delete.');
+    }
+
+    $validTypes = ['student', 'parent', 'teacher', 'staff', 'driver', 'management', 'other'];
+    $sanitized = [];
+    foreach ($types as $t) {
+        $t = strtolower(trim((string)$t));
+        if (in_array($t, $validTypes, true)) {
+            $sanitized[] = $t;
+        }
+    }
+
+    if (empty($sanitized)) {
+        throw new Exception('No valid categories selected.');
+    }
+
+    $placeholders = implode(',', array_fill(0, count($sanitized), '?'));
+
+    $pdo->beginTransaction();
+    try {
+        // Find how many will be deleted
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM contacts WHERE contact_type IN ($placeholders)");
+        $countStmt->execute($sanitized);
+        $count = (int)$countStmt->fetchColumn();
+
+        if ($count > 0) {
+            $deleteStmt = $pdo->prepare("DELETE FROM contacts WHERE contact_type IN ($placeholders)");
+            $deleteStmt->execute($sanitized);
+        }
+
+        $pdo->commit();
+
+        $catNames = implode(', ', array_map('ucfirst', $sanitized));
+        sendJsonResponse([
+            'success' => true,
+            'deleted_count' => $count,
+            'message' => "Successfully deleted $count contact(s) across categories: $catNames."
+        ]);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}
+
 function importBatch($pdo) {
     $raw = file_get_contents('php://input');
     $body = json_decode($raw, true);
@@ -328,14 +380,19 @@ function importBatch($pdo) {
                 continue;
             }
 
-            // Check duplicate by mobile
-            $chk = $pdo->prepare("SELECT id FROM contacts WHERE mobile_number = ? LIMIT 1");
-            $chk->execute([$mob]);
+            // If mobile is too short (< 6 digits, e.g. placeholder 59), generate a unique dummy mobile or allow it
+            if (empty($mob) || strlen($mob) < 5) {
+                $mob = '00000' . rand(10000, 99999);
+            }
+
+            // Check duplicate by BOTH mobile and full_name (so siblings sharing parent's mobile won't overwrite each other)
+            $chk = $pdo->prepare("SELECT id FROM contacts WHERE mobile_number = ? AND LOWER(full_name) = LOWER(?) LIMIT 1");
+            $chk->execute([$mob, $name]);
             $existing = $chk->fetch();
 
             $contactId = null;
             if ($existing) {
-                // Update
+                // Update existing record
                 $contactId = (int)$existing['id'];
                 $pdo->prepare("
                     UPDATE contacts SET
@@ -352,8 +409,8 @@ function importBatch($pdo) {
                     $contactId
                 ]);
             } else {
-                // Insert
-                $localId = 'excel_' . time() . '_' . $index;
+                // Insert new contact
+                $localId = 'excel_' . time() . '_' . $index . '_' . rand(100, 999);
                 $ins = $pdo->prepare("
                     INSERT INTO contacts (
                         local_id, contact_type, full_name, mobile_number, alternate_mobile,
@@ -375,8 +432,35 @@ function importBatch($pdo) {
 
             // Role details
             if ($type === 'student') {
-                $adm = trim($row['admission_number'] ?? $row['Admission_No'] ?? "ADM" . rand(1000, 9999));
-                $class = trim($row['class'] ?? $row['Class'] ?? '1');
+                $rawClass = trim($row['class'] ?? $row['Class'] ?? '');
+                // Clean class: e.g. "1st" -> "1", "2nd" -> "2", "3rd" -> "3", "4th" -> "4", "5th" -> "5", "6th" -> "6", "7th" -> "7"
+                // But preserve NUR, Pre Nur, LKG, UKG
+                $cleanClass = $rawClass;
+                if (preg_match('/^(\d+)(st|nd|rd|th)$/i', $cleanClass, $m)) {
+                    $cleanClass = $m[1];
+                } elseif (strcasecmp($cleanClass, 'pre nur') === 0 || strcasecmp($cleanClass, 'prenur') === 0) {
+                    $cleanClass = 'PRE-NUR';
+                } elseif (strcasecmp($cleanClass, 'nur') === 0) {
+                    $cleanClass = 'NUR';
+                } elseif (strcasecmp($cleanClass, 'lkg') === 0) {
+                    $cleanClass = 'LKG';
+                } elseif (strcasecmp($cleanClass, 'ukg') === 0) {
+                    $cleanClass = 'UKG';
+                }
+                if ($cleanClass === '') {
+                    $cleanClass = 'NUR';
+                }
+
+                $rawAdm = trim($row['admission_number'] ?? $row['Admission_No'] ?? '');
+                $adm = !empty($rawAdm) ? $rawAdm : ('ADM' . str_pad((string)$contactId, 4, '0', STR_PAD_LEFT));
+
+                // If admission number is already taken by another student, make it unique
+                $admCheck = $pdo->prepare("SELECT id FROM students WHERE admission_number = ? AND contact_id != ? LIMIT 1");
+                $admCheck->execute([$adm, $contactId]);
+                if ($admCheck->fetch()) {
+                    $adm = 'ADM' . $contactId . '_' . rand(100, 999);
+                }
+
                 $sec = trim($row['section'] ?? $row['Section'] ?? 'A');
                 $father = trim($row['father_name'] ?? $row['Father_Name'] ?? '');
                 $route = trim($row['bus_route'] ?? $row['Route'] ?? '') ?: null;
@@ -384,11 +468,11 @@ function importBatch($pdo) {
                 $sChk = $pdo->prepare("SELECT id FROM students WHERE contact_id = ?");
                 $sChk->execute([$contactId]);
                 if ($sChk->fetch()) {
-                    $pdo->prepare("UPDATE students SET admission_number = ?, class = ?, section = ?, father_name = ?, bus_route = ? WHERE contact_id = ?")
-                        ->execute([$adm, $class, $sec, $father, $route, $contactId]);
+                    $pdo->prepare("UPDATE students SET student_name = ?, admission_number = ?, class = ?, section = ?, father_name = ?, parent_mobile = ?, bus_route = ? WHERE contact_id = ?")
+                        ->execute([$name, $adm, $cleanClass, $sec, $father, $mob, $route, $contactId]);
                 } else {
                     $pdo->prepare("INSERT INTO students (contact_id, student_name, admission_number, class, section, father_name, parent_mobile, academic_session, bus_route) VALUES (?, ?, ?, ?, ?, ?, ?, '2025-2026', ?)")
-                        ->execute([$contactId, $name, $adm, $class, $sec, $father, $mob, $route]);
+                        ->execute([$contactId, $name, $adm, $cleanClass, $sec, $father, $mob, $route]);
                 }
             } elseif ($type === 'teacher') {
                 $emp = trim($row['employee_id'] ?? $row['Emp_ID'] ?? "TCH" . rand(100, 999));
