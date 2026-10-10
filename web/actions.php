@@ -361,26 +361,37 @@ function importBatch($pdo) {
 
     $imported = 0;
     $skipped = 0;
+    $skippedDetails = [];
     $errors = [];
 
     $pdo->beginTransaction();
 
     foreach ($rows as $index => $row) {
+        $rowNum = $index + 1;
         try {
             $name = trim($row['full_name'] ?? $row['Name'] ?? '');
-            $mob = normalizeMobile($row['mobile_number'] ?? $row['Mobile'] ?? $row['Phone'] ?? '');
+            $rawMob = $row['mobile_number'] ?? $row['Mobile'] ?? $row['Phone'] ?? '';
+            $mob = normalizeMobile($rawMob);
             $type = strtolower(trim($row['contact_type'] ?? $row['Role'] ?? $row['Type'] ?? 'student'));
 
             if (!in_array($type, ['student', 'parent', 'teacher', 'staff', 'driver', 'management', 'other'])) {
                 $type = 'student';
             }
 
-            if (empty($name) || empty($mob)) {
+            if (empty($name)) {
                 $skipped++;
+                $skippedDetails[] = "Row #{$rowNum}: Missing student/contact name.";
                 continue;
             }
 
-            // If mobile is too short (< 6 digits, e.g. placeholder 59), generate a unique dummy mobile or allow it
+            // If mobile is completely missing or blank
+            if (empty($rawMob) && empty($mob)) {
+                $skipped++;
+                $skippedDetails[] = "Row #{$rowNum} ('{$name}'): Missing primary mobile number.";
+                continue;
+            }
+
+            // If mobile is too short (< 5 digits, e.g. placeholder 59), generate a unique dummy mobile or allow it
             if (empty($mob) || strlen($mob) < 5) {
                 $mob = '00000' . rand(10000, 99999);
             }
@@ -510,6 +521,7 @@ function importBatch($pdo) {
         'success' => true,
         'imported_count' => $imported,
         'skipped_count' => $skipped,
+        'skipped_details' => $skippedDetails,
         'errors' => $errors,
         'message' => "Successfully imported {$imported} contacts" . ($skipped > 0 ? " ({$skipped} skipped)" : "")
     ]);

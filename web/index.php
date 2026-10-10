@@ -1740,10 +1740,24 @@
         $('#btnConfirmImport').prop('disabled', false).html('<i class="bi bi-cloud-check-fill me-1"></i> Confirm & Import to Database');
         if (res.success) {
           bootstrap.Modal.getInstance(document.getElementById('importExcelModal')).hide();
+
+          let skippedHtml = '';
+          if (res.skipped_count > 0 && res.skipped_details && res.skipped_details.length > 0) {
+            const listItems = res.skipped_details.map(d => `<li class="text-start mb-1">${d}</li>`).join('');
+            skippedHtml = `
+              <div class="mt-3 p-2 bg-light border rounded text-start small">
+                <strong class="text-danger"><i class="bi bi-exclamation-circle-fill me-1"></i>Skipped Records (${res.skipped_count}):</strong>
+                <ul class="mb-0 ps-3 mt-1 text-muted" style="max-height: 120px; overflow-y: auto;">
+                  ${listItems}
+                </ul>
+              </div>
+            `;
+          }
+
           Swal.fire({
-            icon: 'success',
-            title: 'Import Complete!',
-            text: res.message,
+            icon: res.skipped_count > 0 ? 'warning' : 'success',
+            title: 'Import Finished!',
+            html: `<div>${res.message}</div>${skippedHtml}`,
             confirmButtonColor: '#0284c7'
           });
           dataTableInstance.ajax.reload();
